@@ -1,51 +1,12 @@
-# codetrawl
-#
-# Copyright (C) 2015 Nathaniel J. Smith <njs@pobox.com>
-# 2-clause BSD -- see LICENSE.txt for details
-
-"""Usage:
-  codetrawl.py [--cookies=firefox | chrome] SERVICE [--] QUERY
-
-where SERVICE is 'github' or 'searchcode', and QUERY is a search query
-string.
-
-Options:
-  --cookies=BROWSER   Pull cookies from BROWSER ('firefox' or 'chrome')
-                      (requires browser_cookie package)
-
-Performs the given search on the given code search service, then downloads all
-matching files.
-
-If you want to perform searches while logged in on Github, then use your
-browser to log in as normal, and then use the --cookies option to tell
-codetrawl to use your browser's cookies to authenticate. (Github is more
-aggressive about throttling anonymous users than logged-in users, so this
-makes things a bit faster.)
-
-For each hit, prints a single-line JSON object to stdout, with keys:
-  - service: "github" or "searchcode"
-  - query: the query string used
-  - repo: an unstructured string indicating the repo
-  - path: path to the matching file within this repo
-  - raw_url: a URL where the matching file can be downloaded
-  - content: the matching file's contents (downloaded from raw_url)
-
-Can also be imported as a module:
-
-  from codetrawl import read_matches
-
-  for hit in read_matches([path1, path2, ...]):
-      # hit is a dict with the keys above
-      ...
-"""
+# This file is part of Codetrawl
+# Copyright (C) 2015 Nathaniel Smith <njs@pobox.com>
+# See file LICENSE.txt for license information.
 
 import sys
 import json
 import re
 import time
-from collections import namedtuple
 
-import docopt
 import requests
 from lxml import html
 
@@ -267,6 +228,10 @@ def dump_all_matches(service, query, out_file, session=None):
 
     search_fn = SERVICES[service]
 
+    # FIXME: the output here is terrible
+    # we should just print the query up front at the top
+    # and then
+
     for i, match in enumerate(search_fn(query, session=session)):
         sys.stderr.write("\rFetching file #{} (for {!r})"
                          .format(i + 1, query))
@@ -284,39 +249,3 @@ def dump_all_matches(service, query, out_file, session=None):
         out_file.write(encoded)
         out_file.write("\n")
     sys.stderr.write("\n")
-
-def read_matches(paths):
-    for path in paths:
-        with open(path) as f:
-            for line in f:
-                yield json.loads(line)
-
-if __name__ == "__main__":
-    args = docopt.docopt(__doc__)
-
-    service = args["SERVICE"]
-
-    if service not in SERVICES:
-        sys.exit("service must be one of: {}".format(", ".join(SERVICES)))
-
-    session = requests.Session()
-    if args["--cookies"]:
-        try:
-            import browser_cookie
-        except ImportError:
-            sys.exit("pip install browser_cookie if you want browser cookies")
-        # browser_cookie is super-annoying and likes to print to stdout
-        stdout = sys.stdout
-        try:
-            sys.stdout = sys.stderr
-            if args["--cookies"] == "firefox":
-                jar = browser_cookie.firefox()
-            elif args["--cookies"] == "chrome":
-                jar = browser_cookie.chrome()
-            else:
-                sys.exit("BROWSER should be 'firefox' or 'chrome'")
-        finally:
-            sys.stdout = stdout
-        session.cookies = jar
-
-    dump_all_matches(service, args["QUERY"], sys.stdout, session=session)
