@@ -70,9 +70,9 @@
     {# {{ toggle_many(".hideable", "tree-root") }} #}
     <ul id="tree-root">
       {% for g in groups %}
-      <li>Group: {{ g.name }} ({{ g.filters | length }} filters with {{ group_total_counts[g] }} distinct matching lines)
+      <li>Group: <b>{{ g.name }}</b> ({{ g.filters | length }} filters with {{ group_total_counts[g] }} distinct matching lines)
         {{ toggle(ids[g]) }}
-        <ul class="hideable" style="display: none;" id="{{ ids[g] }}">
+        <ul class="hideable" id="{{ ids[g] }}">
           {% for f in g.filters %}
           <li>Filter: <tt>{{ f.type }}</tt> matches <pre>{{ f.pattern }}</pre>
             ({{ group_lines[g][f] | length }} distinct matching lines)
@@ -88,7 +88,7 @@
         </ul>
       </li>
       {% endfor %}
-      <li>Everything else ({{ leftovers | length }} distinct unmatched lines)
+      <li><b>Everything else</b> ({{ leftovers | length }} distinct unmatched lines)
         {{ toggle("leftovers") }}
         <ul class="hideable" id="leftovers" }}">
           {{ line_matches(leftovers, "leftovers") }}
