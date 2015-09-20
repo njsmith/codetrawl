@@ -31,10 +31,12 @@ For each hit, prints a single-line JSON object to stdout, with keys:
 
 """
 
+import sys
+
 import docopt
 import requests
 
-from .search import dump_all_matches
+from .search import SERVICES, dump_all_matches
 
 args = docopt.docopt(__doc__)
 

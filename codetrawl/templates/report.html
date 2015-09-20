@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8"> <!-- probably a lie but whatever -->
+    <title>Report on lines matching {{ main_pattern }}</title>
+  </head>
+  <body>
+    <style>
+    pre { display: inline; }
+    </style>
+    <script>
+    function toggle_one(id) {
+      var elem = document.getElementById(id);
+      if (elem.style.display != "none") {
+        elem.style.display = "none";
+      } else {
+        elem.style.display = "";
+      }
+    }
+    function toggle_many(selector) {
+      var elems = document.querySelectorAll(selector);
+      var first_elem_state = "none";
+      for (var i = 0; i < elems.length; ++i) {
+        if (i == 0) {
+          first_elem_state = elem.style.display;
+        }
+        if (first_elem_state != "none") {
+          elem.style.display = "none";
+        } else {
+          elem.style.display = "";
+        }
+      }
+    }
+    </script>
+
+    {% macro toggle(selector) %}
+    <small> <a href="javascript:toggle_one('{{ selector }}')">show/hide</a></small>
+    {% endmacro %}
+
+    {% macro line_matches(line_match_dict, ids_key) %}
+      {% for line, matches in line_match_dict | dictsort %}
+      <li><pre>{{ line }}</pre> {{ toggle(ids[ids_key, line]) }}
+        <ul class="hideable" style="display: none;" id="{{ ids[ids_key, line] }}">
+          {%- for match in matches -%}
+          <li><a href="{{ match.raw_url }}">{{ match.repo }} / {{ match.path }}</a></li>
+          {%- endfor -%}
+        </ul>
+      </li>
+      {% endfor %}
+    {% endmacro %}
+
+    <h1>Report on lines matching <pre>{{ main_pattern }}</pre></h1>
+
+    <p>Data files:</p>
+    <ul>
+      {% for path in in_paths %}
+      <li> {{ path }} </li>
+      {% endfor %}
+    </ul>
+
+    <p>Which contain search results for:</p>
+    <ul>
+      {% for ((service, query), count) in queries|dictsort %}
+      <li><pre>{{ query }}</pre> on {{ service }} ({{ count }} files)</li>
+      {% endfor %}
+    </ul>
+    <p>Total files scanned: {{ queries.values() | sum }}</p>
+
+    <h2>Matching lines</h2>
+    {# {{ toggle_many(".hideable", "tree-root") }} #}
+    <ul id="tree-root">
+      {% for g in groups %}
+      <li>Group: {{ g.name }} ({{ g.filters | length }} filters with {{ group_total_counts[g] }} distinct matching lines)
+        {{ toggle(ids[g]) }}
+        <ul class="hideable" style="display: none;" id="{{ ids[g] }}">
+          {% for f in g.filters %}
+          <li>Filter: <tt>{{ f.type }}</tt> matches <pre>{{ f.pattern }}</pre>
+            ({{ group_lines[g][f] | length }} distinct matching lines)
+            {{ toggle(ids[g, f]) }}
+            {% if f.comment %}
+            <br>Comment: <i>{{ f.comment }}</i>
+            {% endif %}
+            <ul class="hideable" style="display: none;" id="{{ ids[g, f] }}">
+              {{ line_matches(group_lines[g][f], (g, f)) }}
+            </ul>
+          </li>
+          {% endfor %}
+        </ul>
+      </li>
+      {% endfor %}
+      <li>Everything else ({{ leftovers | length }} distinct unmatched lines)
+        {{ toggle("leftovers") }}
+        <ul class="hideable" id="leftovers" }}">
+          {{ line_matches(leftovers, "leftovers") }}
+        </ul>
+      </li>
+    </ul>
+  </body>
+</html>

@@ -13,6 +13,51 @@ from lxml import html
 USER_AGENT = "https://github.com/njsmith/codetrawl / njs@pobox.com / using python requests"
 BASE_HEADERS = {"User-Agent": USER_AGENT}
 
+# Invariant: the screen always looks like
+#   ... stuff ...
+#   <tick line>
+#              ^ write position is here
+class Ticker(object):
+    def __init__(self):
+        self._tick_line = ""
+
+    def _terminal_width(self):
+        # HAAAAACK
+        return 75
+
+    def _clear(self):
+        sys.stderr.write("\r")
+        sys.stderr.write(" " * self._terminal_width())
+        sys.stderr.write("\r")
+
+    def say(self, text):
+        self._clear()
+        sys.stderr.write(text)
+        if not text.endswith("\n"):
+            sys.stderr.write("\n")
+        self._rewrite_tick()
+
+    def _rewrite_tick(self):
+        self._clear()
+        sys.stderr.write(self._tick_line)
+
+    def update(self, tick_line):
+        self._tick_line = tick_line
+        self._rewrite_tick()
+
+    def done(self, final_message=""):
+        if self._tick_line:
+            sys.stderr.write("\n")
+        self._tick_line = ""
+        sys.stderr.write(final_message)
+        if final_message and not final_message.endswith("\n"):
+            sys.stderr.write("\n")
+
+    def __del__(self):
+        self.done()
+
+TICKER = Ticker()
+
 def _link_targets(tree):
     for a in tree.cssselect("a"):
         if "href" in a.attrib:
@@ -38,8 +83,8 @@ def _get(session, *args, **kwargs):
         response.raise_for_status()
         end = time.time()
         if backoffs > 0 or end - start > 3:
-            sys.stderr.write("  (request took {:.2f} sec with {} backoffs)\n"
-                             .format(end - start, backoffs))
+            TICKER.say("  Slow request: took {:.1f} sec with {} backoffs"
+                       .format(end - start, backoffs))
         return response
 
 _github_partial_count_re = re.compile(r"Showing [0-9,]+ available code")
@@ -133,9 +178,9 @@ def search_github(query, session=None):
                 if count % 10:
                     total_pages += 1
                 if page == total_pages:
-                    sys.stderr.write("\nFinished pass, but still missing "
-                                     "{} hits (of {}); scanning again\n"
-                                     .format(count - len(hits), count))
+                    TICKER.say("  Finished pass, but only found "
+                               "{} of {} hits; scanning again\n"
+                               .format(len(hits), count))
                     page = 1
                 else:
                     page += 1
@@ -228,18 +273,18 @@ def dump_all_matches(service, query, out_file, session=None):
 
     search_fn = SERVICES[service]
 
-    # FIXME: the output here is terrible
-    # we should just print the query up front at the top
-    # and then
+    TICKER.say("Searching for {!r} on {}".format(query, service))
 
     for i, match in enumerate(search_fn(query, session=session)):
-        sys.stderr.write("\rFetching file #{} (for {!r})"
-                         .format(i + 1, query))
+        TICKER.update("  Fetching file #{}".format(i + 1))
         try:
             r = _get(session, match["raw_url"])
         except requests.HTTPError as e:
-            sys.stderr.write("\nError fetching {}: {}\n".
-                             format(match["raw_url"], e))
+            TICKER.say("  Error fetching {}: {}".format(match["raw_url"], e))
+            TICKER.update("  Failed to fetch file #{}".format(i + 1))
+        else:
+            TICKER.update("  Fetched file #{}, searching for more"
+                          .format(i + 1))
         match["service"] = service
         match["query"] = query
         match["content"] = r.content
@@ -248,4 +293,4 @@ def dump_all_matches(service, query, out_file, session=None):
         assert "\n" not in encoded
         out_file.write(encoded)
         out_file.write("\n")
-    sys.stderr.write("\n")
+    TICKER.done("Finished search for {!r} on {}".format(query, service))
